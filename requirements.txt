@@ -1,0 +1,8 @@
+selenium
+pandas
+pandas-ta
+requests
+python-dotenv
+pytest
+numpy
+streamlit

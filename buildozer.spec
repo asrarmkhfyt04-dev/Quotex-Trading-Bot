@@ -1,51 +1,36 @@
-[app]
-# (str) Title of your application
-title = Alking
+name: Build Alking APK
+on: [push, pull_request]
 
-# (str) Package name
-package.name = alking_app
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-# (str) Package domain (needed for android packaging)
-package.domain = org.alking
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
 
-# (str) Source code where the main.py lives
-source.dir = bot
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev
 
-# (list) Source files to include (let's include all python and env files)
-source.include_exts = py,png,jpg,kv,atlas,env
+      - name: Install Buildozer and Cython
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython virtualenv
 
-# (str) Application version
-version = 1.0.0
+      - name: Build APK with Buildozer
+        run: |
+          yes | buildozer android debug
+        env:
+          BUILDOZER_WARN_ON_ROOT: 0
 
-# (list) Application requirements
-# Note: we include the same libraries from requirements.txt
-requirements = python3,kivy,kivymd,selenium,undetected-chromedriver,pandas,pandas-ta,requests,python-dotenv,numpy
-
-# (str) Supported orientations
-orientation = portrait
-
-# (bool) Indicate if the application should be fullscreen
-fullscreen = 1
-
-# (list) Permissions
-android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE
-
-# (int) Android API to use
-android.api = 31
-
-# (int) Minimum API required
-android.minapi = 21
-
-# (str) Android NDK version to use
-android.ndk = 25b
-
-# (bool) Use setup.py check
-buildozer.use_setup_py = 1
-
-[buildozer]
-# (int) Log level (0 = error only, 1 = info, 2 = debug)
-log_level = 2
-
-# (int) Display warning if buildozer is run as root (0 = off, 1 = on)
-warn_on_root = 1
-
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alking-Installer
+          path: bin/*.apk

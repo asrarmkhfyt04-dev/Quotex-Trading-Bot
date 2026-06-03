@@ -1,152 +1,203 @@
-# bot/trade_executor.py (excerpt)
+# trade_executor.py - معدل للعمل على Android (بدون Selenium)
 
 import time
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
-
-from .config import QUOTEX_USERNAME, QUOTEX_PASSWORD, USE_DEMO, ASSET_NAME
+import threading
+import requests
+from kivy.clock import Clock
 
 class TradeExecutor:
-    def __init__(self):
-        options = uc.ChromeOptions()
-        options.add_argument(
-            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/113.0.5672.127 Safari/537.36"
-        )
-        self.driver = uc.Chrome(options=options)
-        self.driver.implicitly_wait(10)
-        self.login_to_quotex()
-
-    def login_to_quotex(self):
-        self.driver.get("https://qxbroker.com/en/sign-in/modal/")
-        time.sleep(2)
-
-        email_field = self.driver.find_element(By.NAME, "email")
-        email_field.clear()
-        email_field.send_keys(QUOTEX_USERNAME)
-
-        password_field = self.driver.find_element(By.NAME, "password")
-        password_field.clear()
-        password_field.send_keys(QUOTEX_PASSWORD)
-
-        sign_in_button = self.driver.find_element(
-            By.CSS_SELECTOR, "button.button.button--primary.button--spaced[type='submit']"
-        )
-        sign_in_button.click()
-
-        WebDriverWait(self.driver, 20).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, "button.asset-select__button"))
-        )
-        print("DEBUG: Logged in successfully.")
-
-        if USE_DEMO:
-            self._switch_to_demo()
-        else:
-            print("DEBUG: USE_DEMO is false => staying in Live mode.")
-            time.sleep(1)
-
-        final_balance = self.get_account_balance()
-        print(f"DEBUG: Final account balance: {final_balance}")
-
-    def _switch_to_demo(self):
-        menu_container = WebDriverWait(self.driver, 10).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "div.usermenu__info-wrapper"))
-        )
-        menu_container.click()
-        time.sleep(1)
-
-        demo_link = self.driver.find_element(
-            By.CSS_SELECTOR, "a.usermenu__select-name[href='/en/demo-trade']"
-        )
-        demo_link.click()
-        time.sleep(2)
-        print("DEBUG: Clicked Demo Account => should be in Demo mode now.")
-
-        close_btn = WebDriverWait(self.driver, 10).until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, "button.button.button--dark.modal-account-type-changed__body-button")
-            )
-        )
-        close_btn.click()
-        time.sleep(1)
-        print("DEBUG: Clicked 'Close' on the account-type-changed modal.")
-
-    def get_account_balance(self) -> float:
-        balance_elem = self.driver.find_element(By.CSS_SELECTOR, "div.usermenu__info-balance")
-        raw_text = balance_elem.text
-        clean_text = raw_text.replace("$", "").replace(",", "").strip()
-        return float(clean_text)
-
-    def fetch_market_data(self) -> dict:
-        data = {"last_price": 0.0}
-        if USE_DEMO:
-            data["last_price"] = 1.2345
-            return data
-        try:
-            price_elem = self.driver.find_element(By.CSS_SELECTOR, "span.current-price")
-            data["last_price"] = float(price_elem.text)
-        except NoSuchElementException:
-            print("DEBUG: 'span.current-price' not found in Live mode. Setting last_price=0.0.")
-            data["last_price"] = 0.0
-        return data
-
-    def select_asset(self, asset_text=None):
-        if not asset_text:
-            asset_text = ASSET_NAME
-        plus_button = self.driver.find_element(By.CSS_SELECTOR, "button.asset-select__button")
-        plus_button.click()
-        xpath_asset = f"//span[contains(text(),'{asset_text}')]"
-        asset_element = WebDriverWait(self.driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, xpath_asset))
-        )
-        asset_element.click()
-
-    def set_investment_amount(self, target_amount=1.0):
-        invest_container = self.driver.find_element(
-            By.CSS_SELECTOR,
-            "div.input-control.input-control--number.input-control--dark.input-control--text-left"
-        )
-        minus_btn = invest_container.find_element(
-            By.CSS_SELECTOR,
-            "button.input-control__button:nth-of-type(1)"
-        )
-        plus_btn = invest_container.find_element(
-            By.CSS_SELECTOR,
-            "button.input-control__button:nth-of-type(2)"
-        )
-        def read_current_investment():
-            input_elem = invest_container.find_element(By.CSS_SELECTOR, "input.input-control__input")
-            raw = input_elem.get_attribute("value")
-            return float(raw.replace("$", "").strip())
-        max_clicks = 100
-        for _ in range(max_clicks):
-            current = read_current_investment()
-            if abs(current - target_amount) < 1e-9:
-                break
-            if current < target_amount:
-                plus_btn.click()
+    """
+    منفذ الصفقات للأندرويد - يعمل عبر WebView أو API
+    """
+    
+    def __init__(self, webview_manager=None):
+        self.webview = webview_manager
+        self.is_logged_in = False
+        self.account_balance = 10000.0  # رصيد افتراضي تجريبي
+        self.current_asset = "EUR/USD"
+        self.investment_amount = 10.0
+        self.use_demo = True
+        self.last_trade_result = None
+        
+    def login(self, email, password, use_demo=True):
+        """
+        تسجيل الدخول إلى المنصة
+        """
+        self.use_demo = use_demo
+        
+        # هنا سيتم إضافة كود WebView الفعلي لفتح المنصة
+        # حالياً محاكاة لتجربة التطبيق
+        
+        if email and password:
+            self.is_logged_in = True
+            if use_demo:
+                self.account_balance = 10000.0  # رصيد تجريبي
             else:
-                minus_btn.click()
-            time.sleep(0.2)
+                self.account_balance = 1000.0  # رصيد حقيقي افتراضي
+            return True, "تم تسجيل الدخول بنجاح"
+        
+        return False, "فشل تسجيل الدخول"
+    
+    def get_account_balance(self):
+        """
+        الحصول على رصيد الحساب الحالي
+        """
+        return self.account_balance
+    
+    def select_asset(self, asset_name):
+        """
+        اختيار الزوج (العملة)
+        """
+        self.current_asset = asset_name
+        return True
+    
+    def set_investment_amount(self, amount):
+        """
+        تحديد مبلغ الاستثمار
+        """
+        if amount <= self.account_balance:
+            self.investment_amount = amount
+            return True
+        return False
+    
+    def fetch_market_data(self):
+        """
+        جلب بيانات السوق الحالية
+        لعمل حقيقي، سيتم ربطها بـ API أو WebView
+        """
+        import random
+        
+        # بيانات تجريبية للاختبار
+        current_price = random.uniform(1.0000, 1.2000)
+        
+        return {
+            'asset': self.current_asset,
+            'current_price': current_price,
+            'timestamp': time.time(),
+            'candles': self._generate_candles()  # شموع تجريبية
+        }
+    
+    def _generate_candles(self):
+        """
+        توليد شموع تجريبية للتحليل
+        """
+        import random
+        candles = []
+        base_price = 1.1000
+        
+        for i in range(30):
+            change = random.uniform(-0.005, 0.005)
+            close = base_price + change
+            candles.append({
+                'open': base_price,
+                'high': max(base_price, close) + random.uniform(0, 0.002),
+                'low': min(base_price, close) - random.uniform(0, 0.002),
+                'close': close,
+                'volume': random.randint(100, 1000),
+                'timestamp': time.time() - (30 - i) * 60
+            })
+            base_price = close
+        
+        return candles
+    
+    def place_trade(self, direction):
+        """
+        تنفيذ صفقة شراء أو بيع
+        """
+        # هنا سيتم إضافة كود WebView الفعلي لتنفيذ الصفقة
+        # حالياً محاكاة
+        
+        result = self._simulate_trade(direction)
+        self.last_trade_result = result
+        
+        # تحديث الرصيد
+        if result['win']:
+            profit = self.investment_amount * 0.8  # ربح 80%
+            self.account_balance += profit
+            result['profit'] = profit
         else:
-            raise RuntimeError(f"Could not set investment from {current} to {target_amount} in {max_clicks} clicks.")
-
-    def place_trade(self, direction="UP"):
-        if direction.upper() == "UP":
-            up_btn = self.driver.find_element(
-                By.CSS_SELECTOR, "button.button--success.call-btn.section-deal__button"
-            )
-            up_btn.click()
-        else:
-            down_btn = self.driver.find_element(
-                By.CSS_SELECTOR, "button.button--danger.put-btn.section-deal__button"
-            )
-            down_btn.click()
-        time.sleep(1)
-
+            self.account_balance -= self.investment_amount
+            result['loss'] = self.investment_amount
+        
+        return result
+    
+    def _simulate_trade(self, direction):
+        """
+        محاكاة نتيجة الصفقة (70% دقة)
+        """
+        import random
+        
+        win_chance = 70  # نسبة الربح المتوقعة
+        is_win = random.randint(1, 100) <= win_chance
+        
+        return {
+            'win': is_win,
+            'direction': direction,
+            'asset': self.current_asset,
+            'amount': self.investment_amount,
+            'timestamp': time.time()
+        }
+    
+    def get_last_trade_result(self):
+        """
+        الحصول على نتيجة آخر صفقة
+        """
+        return self.last_trade_result
+    
     def close(self):
-        self.driver.quit()
+        """
+        إغلاق الجلسة
+        """
+        self.is_logged_in = False
+        print("تم إغلاق الجلسة")
+
+# ============= كود WebView للربط مع المنصة الحقيقية =============
+# هذا الكود سيتم إضافته لاحقاً لربط التطبيق بمنصة Quotex الفعلية
+# من خلال WebView و JavaScript injection
+
+class QuotexWebViewManager:
+    """
+    مدير WebView للربط مع منصة Quotex
+    """
+    
+    def __init__(self):
+        self.webview = None
+        self.is_ready = False
+        
+    def setup_webview(self):
+        """
+        إعداد WebView للربط مع المنصة
+        """
+        # سيتم إضافة كود Kivy WebView هنا لاحقاً
+        pass
+    
+    def login(self, email, password):
+        """
+        تسجيل الدخول عبر حقن JavaScript
+        """
+        js_code = f"""
+        document.querySelector('input[name="email"]').value = '{email}';
+        document.querySelector('input[name="password"]').value = '{password}';
+        document.querySelector('button[type="submit"]').click();
+        """
+        # تنفيذ الكود في WebView
+        pass
+    
+    def get_balance(self):
+        """
+        الحصول على الرصيد من الصفحة
+        """
+        js_code = """
+        var balanceElem = document.querySelector('div.usermenu__info-balance');
+        return balanceElem ? balanceElem.innerText : '0';
+        """
+        pass
+    
+    def execute_trade(self, direction, amount, asset):
+        """
+        تنفيذ صفقة
+        """
+        js_code = f"""
+        // كود JavaScript لتنفيذ الصفقة على المنصة
+        """
+        pass

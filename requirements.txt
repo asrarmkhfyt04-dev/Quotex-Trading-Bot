@@ -1,11 +1,16 @@
-selenium
-undetected-chromedriver
-pandas
-pandas-ta
-requests
-python-dotenv
-numpy
-kivy
-kivymd
+# requirements.txt - معدل للعمل على Android
+
+# إطارات العمل الأساسية
+kivy==2.3.0
+kivymd==1.1.1
+
+# أدوات البناء (لـ Buildozer فقط)
 buildozer
 cython
+
+# مكتبات التحليل (تعمل على Android)
+numpy
+requests
+
+# ملاحظة: تم إزالة selenium, undetected-chromedriver, pandas, pandas-ta, python-dotenv
+# لأنها لا تعمل على Android وتم استبدالها بكود مخصص في التطبيق

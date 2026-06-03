@@ -1,60 +1,105 @@
-# risk_management.py
+# risk_management.py - معدل للعمل على Android
 
 class RiskManager:
     """
-    Manages risk logic based on the total account balance.
-
-    By default:
-      - stake_pct=0.02  => 2% of account used as stake each trade
-      - profit_pct=0.04 => 4% of account used for a 'take-profit' style threshold
+    إدارة المخاطر للروبوت
     """
 
-    def __init__(self, stake_pct=0.02, profit_pct=0.04):
+    def __init__(self, stake_pct=0.02, profit_pct=0.04, max_daily_loss=0.10):
         """
-        :param stake_pct: Fraction of the account used for each trade stake 
-                          (e.g. 0.02 for 2%).
-        :param profit_pct: Fraction of the account for a 'take-profit' threshold 
-                           (e.g. 0.04 for 4%).
+        :param stake_pct: نسبة المبلغ المستثمر من الرصيد (مثال 0.02 = 2%)
+        :param profit_pct: نسبة الربح المستهدف (مثال 0.04 = 4%)
+        :param max_daily_loss: نسبة الخسارة اليومية القصوى (مثال 0.10 = 10%)
         """
-        self.stake_pct  = stake_pct
+        self.stake_pct = stake_pct
         self.profit_pct = profit_pct
+        self.max_daily_loss = max_daily_loss
+        self.daily_loss = 0
+        self.daily_profit = 0
+        self.initial_balance = 0
+        self.trades_today = 0
 
-    def compute_stop_loss_balance(self, account_balance: float) -> float:
+    def initialize_daily(self, account_balance):
         """
-        Returns the account-balance threshold below which the bot 
-        might stop trading to limit drawdowns.
-        
-        Example: If stake_pct=0.02 and balance=10,000 => threshold=9,800
-                 meaning if the account dips below $9,800, 
-                 we may stop opening new trades.
-        
-        :param account_balance: Current total account balance
-        :return: The 'stop-loss' balance threshold
+        بدء يوم تداول جديد
         """
-        return account_balance * (1.0 - self.stake_pct)
+        self.initial_balance = account_balance
+        self.daily_loss = 0
+        self.daily_profit = 0
+        self.trades_today = 0
 
-    def compute_take_profit_balance(self, account_balance: float) -> float:
+    def check_position_size(self, account_balance):
         """
-        Returns the account-balance threshold above which the bot 
-        might stop trading to secure gains.
+        حساب حجم الصفقة بناءً على الرصيد الحالي
+        """
+        return account_balance * self.stake_pct
+
+    def can_trade(self, account_balance):
+        """
+        التحقق إذا كان يمكن فتح صفقة جديدة
+        """
+        # التحقق من حد الخسارة اليومي
+        current_loss = self.initial_balance - account_balance
+        if current_loss > (self.initial_balance * self.max_daily_loss):
+            return False, f"تجاوز حد الخسارة اليومي {self.max_daily_loss * 100}%"
         
-        Example: If profit_pct=0.04 and balance=10,000 => threshold=10,400 
-                 meaning if we exceed $10,400, 
-                 we may stop opening new trades.
+        # الحد الأقصى 20 صفقة في اليوم
+        if self.trades_today >= 20:
+            return False, "تم الوصول للحد الأقصى للصفقات اليومية (20 صفقة)"
         
-        :param account_balance: Current total account balance
-        :return: The 'take-profit' balance threshold
+        return True, "يمكن التداول"
+
+    def update_result(self, result, amount):
+        """
+        تحديث نتائج التداول
+        """
+        self.trades_today += 1
+        
+        if result == "win":
+            self.daily_profit += amount * 0.8
+        else:
+            self.daily_loss += amount
+
+    def check_streak_limits(self, win_streak, loss_streak):
+        """
+        التحقق من حدود سلسلة الأرباح والخسائر
+        """
+        # وقف بعد 8 صفقات ربح متتالية
+        if win_streak >= 8:
+            return False, "تم تحقيق 8 صفقات ربح متتالية - إيقاف البوت"
+        
+        # وقف بعد صفقتين خسارة متتالية
+        if loss_streak >= 2:
+            return False, "تم تحقيق صفقتين خسارة متتالية - إيقاف البوت"
+        
+        return True, "ضمن الحدود"
+
+    def get_optimal_amount(self, account_balance, signal_confidence):
+        """
+        حساب المبلغ الأمثل بناءً على الثقة في الإشارة
+        """
+        base_amount = account_balance * self.stake_pct
+        
+        # تعديل المبلغ حسب نسبة الثقة (70-100% فقط)
+        if signal_confidence >= 85:
+            multiplier = 1.0
+        elif signal_confidence >= 75:
+            multiplier = 0.75
+        elif signal_confidence >= 70:
+            multiplier = 0.5
+        else:
+            multiplier = 0  # لا تتداول إذا الثقة أقل من 70%
+        
+        return base_amount * multiplier
+
+    def get_take_profit_balance(self, account_balance):
+        """
+        حساب حد الربح المستهدف
         """
         return account_balance * (1.0 + self.profit_pct)
 
-    def check_position_size(self, account_balance: float) -> float:
+    def get_stop_loss_balance(self, account_balance):
         """
-        Computes the actual stake size to open each trade, 
-        as a fraction of the entire account balance.
-        
-        Example: If stake_pct=0.02 and balance=10,000 => trade_size=200
-        
-        :param account_balance: Current total account balance
-        :return: Monetary amount to stake on a single trade
+        حساب حد وقف الخسارة
         """
-        return account_balance * self.stake_pct
+        return account_balance * (1.0 - self.stake_pct)

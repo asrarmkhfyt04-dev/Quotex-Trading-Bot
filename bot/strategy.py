@@ -1,90 +1,134 @@
-# strategy.py
+# strategy.py - معدل للعمل على Android (بدون pandas)
 
-import pandas as pd
-
-# Import custom modules
-from .indicators import calculate_rsi, calculate_macd, calculate_bollinger_bands
+import random
+import math
 
 class TradingStrategy:
     def __init__(self, rsi_buy=25, rsi_sell=75):
         """
-        A stricter strategy requiring triple confluence of 
-        RSI, MACD, and Bollinger Bands to generate signals.
-
-        :param rsi_buy: RSI threshold below which we consider oversold (default 25)
-        :param rsi_sell: RSI threshold above which we consider overbought (default 75)
+        استراتيجية التداول المبسطة للأندرويد
+        تعتمد على تحليل بسيط للشمعة الأخيرة
         """
         self.rsi_buy = rsi_buy
         self.rsi_sell = rsi_sell
-
-    def generate_signal(self, market_data: pd.DataFrame) -> str:
+        self.last_signals = []  # لتخزين آخر الإشارات
+        
+    def generate_signal(self, market_data):
         """
-        Decide whether to 'BUY', 'SELL', or 'HOLD' based on:
-          1) RSI crossing below/above stricter thresholds (25 / 75)
-          2) MACD bullish/bearish crossover
-          3) Price touching or crossing Bollinger Bands
-
-        :param market_data: A DataFrame with a 'close' column at minimum 
-                            (and enough rows for RSI/MACD/Boll. calculations)
-        :return: 'BUY', 'SELL', or 'HOLD'
+        تحليل السوق وإرجاع إشارة BUY أو SELL أو HOLD
+        market_data: قاموس يحتوي على بيانات الشموع
         """
-
-        # Ensure we have enough rows to compute indicators. 
-        # For a 14-bar RSI and ~26-bar MACD, let's require at least 26 bars:
-        if len(market_data) < 26:
+        
+        # إذا كانت البيانات غير كافية
+        if not market_data or len(market_data) < 10:
             return "HOLD"
-
-        # 1) Calculate RSI
-        rsi_series = calculate_rsi(market_data, period=14)
-        current_rsi = rsi_series.iloc[-1]
-
-        # 2) Calculate MACD
-        macd_df = calculate_macd(market_data)
-        # Example columns might be: ['MACD_12_26_9', 'MACDs_12_26_9', 'MACDh_12_26_9']
-        macd_col = [c for c in macd_df.columns if c.startswith("MACD_") and not c.startswith("MACDh_")][0]
-        signal_col = [c for c in macd_df.columns if c.startswith("MACDs_")][0]
-
-        macd_line_current  = macd_df[macd_col].iloc[-1]
-        macd_line_previous = macd_df[macd_col].iloc[-2]
-        macd_signal_current  = macd_df[signal_col].iloc[-1]
-        macd_signal_previous = macd_df[signal_col].iloc[-2]
-
-        # 3) Bollinger Bands
-        bb_df = calculate_bollinger_bands(market_data)
-        # Example columns: ['BBL_20_2.0', 'BBM_20_2.0', 'BBU_20_2.0']
-        bbl_col = [c for c in bb_df.columns if c.startswith("BBL")][0]  # Lower band
-        bbu_col = [c for c in bb_df.columns if c.startswith("BBU")][0]  # Upper band
-
-        price_current = market_data["close"].iloc[-1]
-        lower_band    = bb_df[bbl_col].iloc[-1]
-        upper_band    = bb_df[bbu_col].iloc[-1]
-
-        # Check if price is near/below the lower band or near/above the upper band
-        touching_lower_band = (price_current <= lower_band)
-        touching_upper_band = (price_current >= upper_band)
-
-        # RSI Logic
-        rsi_buy_signal  = (current_rsi < self.rsi_buy)
-        rsi_sell_signal = (current_rsi > self.rsi_sell)
-
-        # MACD Crossover Logic
-        macd_bullish_cross = (
-            macd_line_current > macd_signal_current and
-            macd_line_previous <= macd_signal_previous
-        )
-        macd_bearish_cross = (
-            macd_line_current < macd_signal_current and
-            macd_line_previous >= macd_signal_previous
-        )
-
-        # Final Confluence
-        # BUY if RSI < 25, MACD bullish cross, and price <= lower Band
-        if rsi_buy_signal and macd_bullish_cross and touching_lower_band:
-            return "BUY"
-
-        # SELL if RSI > 75, MACD bearish cross, and price >= upper Band
-        elif rsi_sell_signal and macd_bearish_cross and touching_upper_band:
-            return "SELL"
-
+        
+        # حساب RSI مبسط
+        current_rsi = self.calculate_simple_rsi(market_data)
+        
+        # حساب تقاطع مبسط
+        price_trend = self.calculate_trend(market_data)
+        
+        # حساب مستويات الدعم والمقاومة
+        support, resistance = self.calculate_support_resistance(market_data)
+        current_price = market_data[-1].get('close', 0)
+        
+        # شروط الشراء
+        if current_rsi < self.rsi_buy and price_trend == "UP":
+            if current_price <= support * 1.002:  # قرب مستوى الدعم
+                return "BUY"
+        
+        # شروط البيع
+        if current_rsi > self.rsi_sell and price_trend == "DOWN":
+            if current_price >= resistance * 0.998:  # قرب مستوى المقاومة
+                return "SELL"
+        
+        return "HOLD"
+    
+    def calculate_simple_rsi(self, data):
+        """
+        حساب RSI مبسط بدون pandas
+        """
+        if len(data) < 15:
+            return 50
+        
+        gains = 0
+        losses = 0
+        
+        for i in range(len(data) - 14, len(data)):
+            change = data[i].get('close', 0) - data[i-1].get('close', 0)
+            if change > 0:
+                gains += change
+            else:
+                losses += abs(change)
+        
+        if losses == 0:
+            return 100
+        
+        rs = gains / losses
+        rsi = 100 - (100 / (1 + rs))
+        
+        return rsi
+    
+    def calculate_trend(self, data):
+        """
+        حساب اتجاه السعر (UP/DOWN/SIDEWAYS)
+        """
+        if len(data) < 5:
+            return "SIDEWAYS"
+        
+        # مقارنة سعر الإغلاق الحالي مع متوسط آخر 5 شموع
+        recent_closes = [c.get('close', 0) for c in data[-5:]]
+        avg_close = sum(recent_closes) / len(recent_closes)
+        current_close = data[-1].get('close', 0)
+        
+        if current_close > avg_close * 1.002:
+            return "UP"
+        elif current_close < avg_close * 0.998:
+            return "DOWN"
         else:
-            return "HOLD"
+            return "SIDEWAYS"
+    
+    def calculate_support_resistance(self, data):
+        """
+        حساب مستويات الدعم والمقاومة
+        """
+        if len(data) < 10:
+            # قيم افتراضية
+            current_price = data[-1].get('close', 100)
+            return current_price * 0.99, current_price * 1.01
+        
+        highs = [c.get('high', 0) for c in data[-10:]]
+        lows = [c.get('low', 0) for c in data[-10:]]
+        
+        resistance = max(highs)
+        support = min(lows)
+        
+        return support, resistance
+    
+    def get_signal_confidence(self, market_data):
+        """
+        حساب نسبة الثقة في الإشارة (0-100)
+        """
+        signal = self.generate_signal(market_data)
+        
+        if signal == "HOLD":
+            return 0
+        
+        current_rsi = self.calculate_simple_rsi(market_data)
+        trend = self.calculate_trend(market_data)
+        
+        confidence = 50  # أساس
+        
+        # تعديل نسبة الثقة بناءً على RSI
+        if signal == "BUY":
+            confidence += (self.rsi_buy - current_rsi) * 2
+        else:
+            confidence += (current_rsi - self.rsi_sell) * 2
+        
+        # تعديل نسبة الثقة بناءً على الاتجاه
+        if (signal == "BUY" and trend == "UP") or (signal == "SELL" and trend == "DOWN"):
+            confidence += 15
+        
+        # تحديد النسبة بين 0 و 100
+        return max(0, min(100, confidence))

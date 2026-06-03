@@ -3,19 +3,23 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      
-      - name: Build with Buildozer
-        uses: ArtemSerebrennikov/buildozer-action@v1
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          buildozer_version: master
+          python-version: '3.9'
+
+      - name: Build with Buildozer
+        uses: Kuldeeprawat96/buildozer-action@v1
+        with:
           command: buildozer android debug
           repository_root: .
-          
+
       - name: Upload APK
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Alking-Installer
           path: bin/*.apk

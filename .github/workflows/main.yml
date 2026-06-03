@@ -5,20 +5,31 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      - name: Build with Buildozer
-        uses: Kuldeeprawat96/buildozer-action@v1
-        with:
-          command: buildozer android debug
-          repository_root: .
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache git libncurses5:i386 libstdc++6:i386 libgtk2.0-0:i386 libpangox-1.0-0:i386 libpangoxft-1.0-0:i386 libidn11:i386 Python3-pip unzip zlib1g-dev default-jdk
 
-      - name: Upload APK
+      - name: Install Buildozer and Cython
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython virtualenv
+
+      - name: Build APK with Buildozer
+        run: |
+          yes | buildozer android debug
+        env:
+          BUILDOZER_WARN_ON_ROOT: 0
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Alking-Installer

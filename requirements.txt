@@ -1,8 +1,11 @@
 selenium
+undetected-chromedriver
 pandas
 pandas-ta
 requests
 python-dotenv
-pytest
 numpy
-streamlit
+kivy
+kivymd
+buildozer
+cython

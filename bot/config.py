@@ -1,28 +1,31 @@
-# config.py
+# config.py - معدل للعمل على Android
 
-# Import necessary libraries and packages
 import os
-from dotenv import load_dotenv
 
-# Load environment variables 
-load_dotenv()
+# بيانات تسجيل الدخول (سيتم إدخالها من المستخدم عبر الواجهة)
+QUOTEX_USERNAME = ""
+QUOTEX_PASSWORD = ""
+USE_DEMO = True
 
-# Load Quotex credentials
-QUOTEX_USERNAME= os.environ.get('QUOTEX_USERNAME', 'demo@example.com')
-QUOTEX_PASSWORD= os.environ.get('QUOTEX_PASSWORD', 'mypassword123')
-USE_DEMO= os.environ.get("USE_DEMO", "false").lower() == "true"
-print("DEBUG config.py => USE_DEMO =", USE_DEMO)
+# الزوج الافتراضي (سيتم اختياره من المستخدم)
+ASSET_NAME = "EUR/USD"
 
-# Asset Name
-ASSET_NAME = os.environ.get("ASSET_NAME", "AUD/USD (OTC)")
+# إعدادات المؤشرات الفنية
+RSI_THRESHOLD = 30
+MACD_FAST = 12
+MACD_SLOW = 26
+MACD_SIGNAL = 9
 
-# Trading indicators
-RSI_THRESHOLD= int(os.environ.get('RSI_THRESHOLD', 30))
-MACD_FAST= int(os.environ.get('MACD_FAST', 12))
-MACD_SLOW= int(os.environ.get('MACD_SLOW', 26))
-MACD_SIGNAL= int(os.environ.get('MACD_SIGNAL', 9))
+# إعدادات المخاطرة والتداول
+TRADE_AMOUNT = 10.0  # المبلغ الافتراضي بالدولار
+BOLLINGER_PERIOD = 20
+BOLLINGER_STD_DEV = 2.0
 
-# Risk and trade settings
-TRADE_AMOUNT= float(os.environ.get('TRADE_AMOUNT', 1.0))
-BOLLINGER_PERIOD= int(os.environ.get('BOLLINGER_PERIOD', 20))
-BOLLINGER_STD_DEV= float(os.environ.get('BOLLINGER_STD_DEV', 2.0))
+# إعدادات البوت
+MAX_WIN_STREAK = 8      # وقف بعد 8 صفقات ربح
+MAX_LOSS_STREAK = 2     # وقف بعد صفقتين خسارة
+SLEEP_BETWEEN_TRADES = 180  # 3 دقائق بين كل صفقة (بالثواني)
+
+# إعدادات المنصة
+PLATFORM_URL = "https://qxbroker.com"
+WEBVIEW_LOAD_TIMEOUT = 30

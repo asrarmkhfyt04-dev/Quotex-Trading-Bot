@@ -36,7 +36,6 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          buildozer init
           buildozer -v android debug
         env:
           BUILDOZER_WARN_ON_ROOT: 0

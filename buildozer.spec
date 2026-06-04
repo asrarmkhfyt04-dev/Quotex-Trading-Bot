@@ -2,8 +2,8 @@
 title = Alking
 package.name = alking_app
 package.domain = org.alking
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,env
+source.dir = bot          # <- هاد التغيير الوحيد اللي يهم
+source.include_exts = py,png,jpg,kv,atlas,env,ttf
 version = 1.0.0
 requirements = python3,kivy,kivymd,numpy,requests
 orientation = portrait
